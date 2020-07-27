@@ -115,7 +115,6 @@ for i in range(len(stress_autocor)-windowsize):
 ##################################################
 
 # integrated = [sp.sum(stress_autocor[:i]) for i in range(len(stress_autocor))]
-#TODO working here
 
 viscosityfactor = (
   10**10                  #bar^2 t Pa^2
@@ -143,6 +142,10 @@ visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
 visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
 visco_sem = sp.array(visco_sem, dtype = float)
 
+#TODO i need to now *save* all of these arrays... duh.
+names = sp.array(['names', 'viscosity at each timestep (from 0)', 'viscosity uncertainties', 'rolling weighted average viscosity from 0', 'SEM for rolling average viscosity'])
+
+sp.savez_compressed('./py_output.npz', names, visco_arr, visco_uncertainties, visco_rolling, visco_sem)
 
 def plotter():
 
@@ -225,4 +228,4 @@ def plotter():
 
 
 
-plotter()
+# plotter()
