@@ -5,11 +5,17 @@ import matplotlib.pyplot as plt
 from statsmodels.stats.weightstats import DescrStatsW
 from scipy import linalg
 
-xvgname = 'nvt_analysis/pressure.xvg'
+print('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
+
+# xvgname = '../nvt_analysis/pressure.xvg'
+# heightname = '../nvt_analysis/thickness.xvg'
+# struct_filename = '../step7_short.gro'
+# print(xvgplace)
+
+xvgname = './pressure-tensor.xvg'
 xvgplace = ''.join(xvgname.partition('/')[:-1])
-print(xvgplace)
-heightname = 'nvt_analysis/thickness.xvg'
-struct_filename = 'step7_short.gro'
+heightname = './thickness.xvg'
+struct_filename = './step8_nvt.gro'
 
 with open(struct_filename) as f:
   sizeline = f.readlines()[-1]
@@ -20,14 +26,14 @@ for i,size in enumerate(sizes):
 
 
 bigpressure = pd.read_csv(xvgname,
-                          skiprows=33, 
+                          skiprows=33,
                           header=None, delim_whitespace=True)
 
 bigpressure.columns = ['time (ps)', 'temp',
                       'xx', 'xy', 'xz',
                       'yx', 'yy', 'yz',
                       'zx', 'zy', 'zz']
-                      
+
 # @ s0 legend "Temperature"
 # @ s1 legend "Pres-XX"
 # @ s2 legend "Pres-XY"
@@ -48,7 +54,8 @@ print(stepsize)
 
 #make stress tensor
 
-skipping = 90000 # 10000
+# actually use 10000
+skipping = 80000 #97000
 stress = sp.zeros(len(bigpressure)-skipping)
 for i in range(len(bigpressure)-skipping):
   stress[i] = sp.mean([bigpressure.xy[skipping+i], bigpressure.yx[skipping+i]])
@@ -70,31 +77,20 @@ def autocor(arr, tau):
     print(f'{(tau/len(arr))**(1/2)*100:6.2f}', '%')
   return(sp.mean(aaa),sp.stats.sem(aaa))
 
-
-# stepsize = 2*10**-12 #in seconds          # this probably needs to change
-# # bigpressure['time (fs)'][1] - bigpressure['time (fs)'][0]
-# boxvol = 1102.7 #in nm^3                  # this needs to change
-# viscosityfactor = (                       # this needs to change             
-#     (stepsize * 10**10)                   # this needs to change
-#   * (boxvol * (10**-9)**3)                # this needs to change
-#   * (1.38064852 * 10**-23 * 303)**(-1)    # this needs to change
-#   * (4.2*10**(-9))                        # wtf is this
-# )
-
 #  this all seems wrong to me... i'll fix it here we go:
-temp = bigpressure['temp'].mean()
-tempsem = sp.stats.sem(bigpressure['temp'])
+temp = bigpressure['temp'][skipping:].mean()
+tempsem = sp.stats.sem(bigpressure['temp'][skipping:])
 print(tempsem)
 # print(temp)
 boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27 # volume in m^3
 
-viscosityfactor = (
-  10**10                    # bar^2 to Pa^2
-  * stepsize
-  * (boxvol)    
-  * (1.38064852 * 10**-23 * temp)**(-1) # kb T
-  * thickness
-)
+# viscosityfactor = (
+#   10**10                    # bar^2 to Pa^2
+#   * stepsize
+#   * (boxvol)
+#   * (1.38064852 * 10**-23 * temp)**(-1) # kb T
+#   * thickness
+# )
 
 stress_autocor = sp.array([[autocor(stress,tau)[0], autocor(stress,tau)[1]]\
   for tau in range(len(stress)-1)])
@@ -109,42 +105,6 @@ unclist = sp.array(unclist,dtype=float)
 # print(sp.amin(unclist**-2))
 print('uncertainties')
 
-weights = unclist**-2 / sp.linalg.norm(unclist**-2)
-# print(weights)
-
-meanlist_stats = sp.array([
-  DescrStatsW(integrated[:i], weights=weights[:i], ddof = 0)\
-     for i in range(1,len(integrated))
-])
-
-# meanlist = [sp.average(integrated[:i],weights=unclist[:i]**-2) for i in range(1,len(integrated))]
-meanlist = sp.array([stat.mean for stat in meanlist_stats])
-meanlist = sp.insert(meanlist, 0, integrated[0])
-meanlist[1] = integrated[1]
-meanlist = sp.array(meanlist,dtype=float)
-# print('first means', meanlist[:10])
-# print(meanlist)
-
-print('means')
-# First attempt
-# stdlist = [sp.std(integrated[:i]) for i in range(1,len(integrated))]
-
-# Second attempt
-# stdlist = [sp.sum(unclist[:i]**-2)**(-1/2) for i in range(1,len(integrated))]
-# stdlist.append(stdlist[-1])
-# stdlist = sp.array(stdlist)
-# stdlist[0] = stdlist[1]
-
-# Third Attempt
-stdlist = sp.array([stat.std_mean for stat in meanlist_stats[1:]])
-# stdlist[0] = integrated[0]
-stdlist = sp.insert(stdlist, 0, stdlist[0])
-stdlist = sp.insert(stdlist, 0, stdlist[0])
-stdlist = sp.array(stdlist,dtype=float)
-# print(stdlist[:10])
-# print('len',len(stdlist))
-print('standarddev')
-
 ##################################################
 
 movingavg = sp.zeros_like(stress_autocor[:,0])
@@ -155,19 +115,34 @@ for i in range(len(stress_autocor)-windowsize):
 ##################################################
 
 # integrated = [sp.sum(stress_autocor[:i]) for i in range(len(stress_autocor))]
+#TODO working here
 
-visco2av = sp.average(meanlist,weights=stdlist**-2)
-# unc2av = sp.sqrt(sp.sum(stdlist**2))
-unc2av = sp.sum(stdlist**-2)**(-1/2)
+viscosityfactor = (
+  10**10                  #bar^2 t Pa^2
+  * stepsize
+  * boxvol
+  * (1.38064852 * 10**-23)**(-1) #1/k_B
+)
 
-viscoraw = sp.average(integrated,weights=unclist**-2)
-# uncraw = sp.sqrt(sp.sum(unclist**2))
-uncraw = sp.sum(unclist**-2)**(-1/2)
+visco_arr = viscosityfactor / temp * thickness * integrated
+visco_uncertainties = visco_arr * sp.sqrt(
+  (tempsem/temp)**2 + (thicksem/thickness)**2 + (unclist/integrated)**2
+)
 
-# print(str(visco2av *viscosityfactor)+'   '+str(unc2av *viscosityfactor))
-# print(str(viscoraw *viscosityfactor)+'   '+str(uncraw *viscosityfactor))
+def normed(x):
+  return(x/sp.linalg.norm(x))
 
-names = sp.array([''])
+visco_rolling_stats = sp.array([DescrStatsW(visco_arr[:i], weights=normed(visco_uncertainties[:i]**(-2)), ddof=0) for i in range(1,len(integrated))])
+
+visco_rolling = sp.array([stat.mean for stat in visco_rolling_stats])
+visco_rolling = sp.insert(visco_rolling, 0, visco_arr[0])
+visco_rolling = sp.array(visco_rolling, dtype=float)
+print('means')
+visco_sem = sp.array([stat.std_mean for stat in visco_rolling_stats[1:]])
+visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
+visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
+visco_sem = sp.array(visco_sem, dtype = float)
+
 
 def plotter():
 
@@ -215,15 +190,21 @@ def plotter():
   plt.figure()
   # imean = sp.mean(integrated)
   # istd = sp.std(integrated)
-  integrated = sp.array(integrated)
-  plt.plot(xarr, integrated * viscosityfactor, '-', c='C0', alpha = 0.2,label='viscosity')
-  print(len(xarr), len(meanlist))
-  plt.plot(xarr, meanlist * viscosityfactor, '-', c='C1', alpha = 0.2,
-    label='average viscosity from $\Delta\\tau$=0')
-  plt.fill_between(xarr, (integrated+unclist) * viscosityfactor,
-    (integrated-unclist) * viscosityfactor, alpha = 0.2, color='C0')
-  plt.fill_between(xarr, (meanlist+stdlist) * viscosityfactor,
-    (meanlist-stdlist) * viscosityfactor, alpha = 0.2, color='C1')
+  #TODO start editing here
+  # plt.plot(xarr, integrated * viscosityfactor, '-', c='C0', alpha = 0.2,label='viscosity')
+  # plt.plot(xarr, meanlist * viscosityfactor, '-', c='C1', alpha = 0.2,
+  #   label='average viscosity from $\Delta\\tau$=0')
+  # plt.fill_between(xarr, (integrated+unclist) * viscosityfactor,
+  #   (integrated-unclist) * viscosityfactor, alpha = 0.2, color='C0')
+  # plt.fill_between(xarr, (meanlist+stdlist) * viscosityfactor,
+  #   (meanlist-stdlist) * viscosityfactor, alpha = 0.2, color='C1')
+
+  plt.plot(xarr, visco_arr, '-', c='C0')
+  plt.fill_between(xarr, visco_arr+visco_uncertainties, visco_arr-visco_uncertainties, color='C0', alpha=0.2)
+
+  plt.plot(xarr, visco_rolling, '-', c='C1')
+  plt.fill_between(xarr, visco_rolling+visco_sem, visco_rolling-visco_sem, color='C1', alpha=0.2)
+
   plt.plot([0,2E-8],sp.array([1,1])*19.68E-11,'--',c='black',
     label='previous measurement')
   plt.fill_between([0,2E-8],
@@ -231,35 +212,17 @@ def plotter():
                   sp.array([1,1])*(19.68+0.69)*1E-11,
                   alpha = 0.1, color='black')
 
-
-  # mmm = 40000
-  # plt.ylim(-mmm,mmm)
-
   plt.title('Green Kubo')
   plt.ylabel('Viscosity $(Pa\cdot m\cdot s)$')
   plt.xlabel('$\Delta\\tau$ (sec)')
   plt.xscale('log')
   plt.xlim(xarr[1]/1.01,xarr[-1]*1.1)
   plt.ylim(0,0.5e-9)
-  # plt.show()
-
-  #this didn't work too well
-  # where = sp.argmin(stdlist[1:])
-  # plt.axvline(x=xarr[where])
-
-  # plt.axhline(y=visco2av*viscosityfactor,linestyle='--',color='C2',label = 'viscosity from rolling average')
-  # plt.axhline(y=(visco2av-unc2av)*viscosityfactor,color='C2',alpha=0.5)
-  # plt.axhline(y=(visco2av+unc2av)*viscosityfactor,color='C2',alpha=0.5)
-
-  # plt.axhline(y=viscoraw*viscosityfactor,linestyle='--',color='C3',label = 'viscosity from raw')
-  # plt.axhline(y=(viscoraw-uncraw)*viscosityfactor,color='C3',alpha=0.5)
-  # plt.axhline(y=(viscoraw+uncraw)*viscosityfactor,color='C3',alpha=0.5)
-  # print(viscomaybe*viscosityfactor)
 
   plt.legend(loc=0)
   plt.savefig(xvgplace+'visco-integral.png')
-  # plt.show()
+  plt.show()
 
 
 
-# plotter()
+plotter()
