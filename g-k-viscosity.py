@@ -54,7 +54,7 @@ stepsize = bigpressure['time (ps)'][1] * 10**(-12)
 #make stress tensor
 
 # actually use 10000
-skipping = 85000 #97000
+skipping = 10000 #97000
 stress = sp.zeros(len(bigpressure)-skipping)
 for i in range(len(bigpressure)-skipping):
   stress[i] = sp.mean([bigpressure.xy[skipping+i], bigpressure.yx[skipping+i]])
@@ -124,7 +124,7 @@ viscosityfactor = (
 )
 
 visco_arr = viscosityfactor / temp * thickness * integrated
-visco_uncertainties = visco_arr * sp.sqrt(
+visco_uncertainties = sp.absolute(visco_arr) * sp.sqrt(
   (tempsem/temp)**2 + (thicksem/thickness)**2 + (unclist/integrated)**2
 )
 
@@ -134,19 +134,31 @@ def normed(x):
 # visco_rolling_stats = sp.array([DescrStatsW(visco_arr[:i], weights=normed(visco_uncertainties[:i]**(-2)), ddof=0) for i in range(1,len(integrated))])
 
 # visco_rolling = sp.array([stat.mean for stat in visco_rolling_stats])
-visco_rolling = sp.array([sp.average(visco_arr[:i], weights=normed(visco_uncertainties[:i]**(-2))) for i in range(1, len(visco_arr))])
+visco_rolling = sp.array([sp.average(visco_arr[:i], weights=visco_uncertainties[:i]**(-2)) for i in range(1, len(visco_arr))])
 visco_rolling = sp.insert(visco_rolling, 0, visco_arr[0])
 visco_rolling = sp.array(visco_rolling, dtype=float)
 #Aprint('means')
-# visco_sem = sp.array([stat.std_mean for stat in visco_rolling_stats[1:]])
-visco_sem = sp.array(
-  [
-    sp.var(visco_uncertainties[:i])
-    * sp.sum(visco_uncertainties[:i]**(-4))
-    / (sp.sum(visco_uncertainties[:i]**(-2))**2)
-    for i in range(1, len(visco_arr))
-    ]
-  )**(1/2)
+
+# THIS ONE DIDN'T WORK
+# visco_sem = sp.array(
+#   [
+#     sp.var(visco_uncertainties[:i])
+#     * sp.sum(visco_uncertainties[:i]**(-4))
+#     / (sp.sum(visco_uncertainties[:i]**(-2))**2)
+#     for i in range(1, len(visco_arr))
+#     ]
+#   )**(1/2)
+
+visco_sem = sp.array([
+  (
+    (
+      sp.average(visco_arr[:i]**2, weights=visco_uncertainties[:i]**(-2))
+      - sp.average(visco_arr[:i], weights=visco_uncertainties[:i]**(-2))**2
+    )
+  )
+  for i in range(2, len(visco_arr))
+])**(1/2)
+visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
 visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
 visco_sem = sp.array(visco_sem, dtype = float)
 
@@ -234,4 +246,4 @@ def plotter():
 
 
 
-plotter()
+#plotter()
