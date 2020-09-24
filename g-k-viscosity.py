@@ -1,37 +1,47 @@
 import pandas as pd
+import dask.dataframe as dd
+
 import scipy as sp
+import numpy as np
 from scipy import stats
-import matplotlib.pyplot as plt
-# from statsmodels.stats.weightstats import DescrStatsW
 from scipy import linalg
 
-#Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
+print('started')
 
-# xvgname = '../nvt_analysis/pressure.xvg'
-# heightname = '../nvt_analysis/thickness.xvg'
-# struct_filename = '../step7_short.gro'
-# #Aprint(xvgplace)
+# Aprint('NOTE: this does not yet account for the water viscosity or the
+# thickness of the membrane *relative* to the box.')
 
-xvgname = './pressure-tensor.xvg'
-xvgplace = ''.join(xvgname.partition('/')[:-1])
-heightname = './thickness.xvg'
-struct_filename = './step8_nvt.gro'
+xvgname = "./pressure-tensor.xvg"
+xvgplace = "".join(xvgname.partition("/")[:-1])
+heightname = "./thickness.xvg"
+struct_filename = "./step8_nvt.gro"
 with open(struct_filename) as f:
-  sizeline = f.readlines()[-1]
-#Aprint(sizeline)
+    sizeline = f.readlines()[-1]
+# Aprint(sizeline)
 sizes = sizeline.split()
-for i,size in enumerate(sizes):
-  sizes[i] = float(size)
+for i, size in enumerate(sizes):
+    sizes[i] = float(size)
+
+skipping = 0  # 97000 # 10,000,000 for 2fs sampling
+
+print('pandas importing')
+
+bigpressure = dd.read_csv(xvgname, skiprows=26+skipping, header=None, delim_whitespace=True)
 
 
-bigpressure = pd.read_csv(xvgname,
-                          skiprows=33,
-                          header=None, delim_whitespace=True)
-
-bigpressure.columns = ['time (ps)', 'temp',
-                      'xx', 'xy', 'xz',
-                      'yx', 'yy', 'yz',
-                      'zx', 'zy', 'zz']
+bigpressure.columns = [
+    "time (ps)",
+    "temp",
+    # "xx",
+    "xy",
+    # "xz",
+    "yx",
+    # "yy",
+    # "yz",
+    # "zx",
+    # "zy",
+    # "zz",
+]
 
 # @ s0 legend "Temperature"
 # @ s1 legend "Pres-XX"
@@ -44,100 +54,122 @@ bigpressure.columns = ['time (ps)', 'temp',
 # @ s8 legend "Pres-ZY"
 # @ s9 legend "Pres-ZZ"
 
-height_v = pd.read_csv(heightname,skiprows=17,header=None,delim_whitespace=True)
-height_v.columns = ['t','x','y','z']
+height_v = pd.read_csv(heightname, skiprows=17, header=None, delim_whitespace=True)
+height_v.columns = ["t", "x", "y", "z"]
 
-stepsize = bigpressure['time (ps)'][1] * 10**(-12)
+stepsize = (
+    bigpressure["time (ps)"].loc[1].values
+    - bigpressure["time (ps)"].loc[0].values
+).compute() * 10 ** (-12)
 
-#Aprint(stepsize)
+stress = bigpressure[['xy','yx']].mean(axis=1)
 
-#make stress tensor
+# NOTE: this shifts the "stress" array down so that the mean is zero
+stress -= stress.mean()
 
-# actually use 10000
-skipping = 10000 #97000
-stress = sp.zeros(len(bigpressure)-skipping)
-for i in range(len(bigpressure)-skipping):
-  stress[i] = sp.mean([bigpressure.xy[skipping+i], bigpressure.yx[skipping+i]])
-stressmean = [sp.mean([stress[sp.maximum(0,i-25):i+1]])\
-  for i in range(len(stress)-1)]
-stressuncertainty = [sp.std([stress[:i+1]])/sp.sqrt(i+1)\
-  for i in range(len(stress)-1)]
-# #Aprint(len(stress))
+thickness = sp.absolute(sp.mean(height_v.z)) * 10 ** (-9)
+thicksem = sp.stats.sem(height_v.z) * 10 ** (-9)
 
-thickness = sp.absolute(sp.mean(height_v.z[skipping//100:])) * 10**(-9)
-thicksem = sp.stats.sem(height_v.z[skipping//100:]) * 10**(-9)
-#Aprint('thickness ', thickness*10**9)
 
 def autocor(arr, tau):
-  if tau>len(arr):
-    return('tau set too large')
-    exit()
-  aaa = sp.array([arr[i]*arr[i+tau] for i in range(len(arr)-tau)])
-  if tau%100 == 0:
-    print(f'{(tau/len(arr))**(1/2)*100:6.2f}', '%')
-  return(sp.mean(aaa),sp.stats.sem(aaa))
+    if tau > len(arr):
+        print("tau ", tau, "    lenarr ", len(arr))
+        return "tau set too large"
+    aaa = arr.loc[tau:].values * arr.loc[:len(stress) - tau - 1].values
+    # if tau % 100 == 0:
+    #     print(f"\r{(tau/len(arr))*100:6.2f}", "%   ", end="")
+    return(aaa.mean(),(aaa.var()/(len(arr)-tau))**0.5)
 
-#  this all seems wrong to me... i'll fix it here we go:
-temp = bigpressure['temp'][skipping:].mean()
-tempsem = sp.stats.sem(bigpressure['temp'][skipping:])
-#Aprint(tempsem)
-# #Aprint(temp)
-boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27 # volume in m^3
+# stress_autocor = sp.zeros((len(stress)-1, 2))
+# for tau in range(len(stress)-1):
+#     stress_autocor[tau] = autocor(stress, tau)
 
-# viscosityfactor = (
-#   10**10                    # bar^2 to Pa^2
-#   * stepsize
-#   * (boxvol)
-#   * (1.38064852 * 10**-23 * temp)**(-1) # kb T
-#   * thickness
-# )
+# print('got autocor')
 
-stress_autocor = sp.array([[autocor(stress,tau)[0], autocor(stress,tau)[1]]\
-  for tau in range(len(stress)-1)])
+def autocor_full(arr):
+#     arr = arr_in.to_dask_array(lengths=True)
+    autocor = sp.zeros(Len-2*Max+1)
+#     autocor_unc = sp.zeros(Len-2*Max+1)
+    for tau in range(Len-2*Max+1):
+        if tau%1000 == 0:
+            print(tau/(Len-2*Max+1))
+        autocor[tau] = arr.autocorr(tau, split_every=100).compute()
+    return(autocor)
 
-integrated = sp.array([sp.sum(stress_autocor[:i+1,0]) for i in range(len(stress_autocor))])
-# #Aprint(integrated[:10])
-# #Aprint(len(integrated))
+temp = bigpressure["temp"].mean().compute()
+tempsem = bigpressure["temp"].sem().compute()
 
-unclist = sp.array([sp.sqrt(sp.sum(stress_autocor[:i,1]**2)) for i in range(1,len(integrated))])
+boxvol = sizes[0] * sizes[1] * sizes[2] * 10 ** -27  # volume in m^3
+
+Len = len(stress)
+Max = 10000
+
+stress_autocor, sem_list = autocor_full(stress)
+
+
+
+# TODO i can do better here on the integration
+integrated = sp.array([sp.sum(stress_autocor[:i+1]) for i in len(range(stress_autocor))])
+
+# integrated = sp.array([sp.sum(stress_autocor[: i + 1, 0]) for i in range(len(stress_autocor))])
+
+print('integrated')
+
+unclist = sp.array(
+    [sp.sqrt(sp.sum(sem_list[:i+1] ** 2))
+        for i in range(len(integrated))]
+)
 unclist = sp.insert(unclist, 0, unclist[0])
-unclist = sp.array(unclist,dtype=float)
+unclist = sp.array(unclist, dtype=float)
 # #Aprint(sp.amin(unclist**-2))
-#Aprint('uncertainties')
+
+print('uncertainties')
 
 ##################################################
 
-movingavg = sp.zeros_like(stress_autocor[:,0])
-windowsize = 25
-for i in range(len(stress_autocor)-windowsize):
-    movingavg[i] = sp.average(stress_autocor[i:i+windowsize,0])
+# movingavg = sp.zeros_like(stress_autocor[:, 0])
+# windowsize = 25
+# for i in range(len(stress_autocor) - windowsize):
+#     movingavg[i] = sp.average(stress_autocor[i : i + windowsize, 0])
 
 ##################################################
 
 # integrated = [sp.sum(stress_autocor[:i]) for i in range(len(stress_autocor))]
 
 viscosityfactor = (
-  10**10                  #bar^2 t Pa^2
-  * stepsize
-  * boxvol
-  * (1.38064852 * 10**-23)**(-1) #1/k_B
+    10 ** 10  # bar^2 t Pa^2
+    * stepsize
+    * boxvol
+    * (1.38064852 * 10 ** -23) ** (-1)  # 1/k_B
 )
 
 visco_arr = viscosityfactor / temp * thickness * integrated
 visco_uncertainties = sp.absolute(visco_arr) * sp.sqrt(
-  (tempsem/temp)**2 + (thicksem/thickness)**2 + (unclist/integrated)**2
+    (tempsem / temp) ** 2 + (thicksem / thickness) ** 2 + (unclist / integrated) ** 2
 )
 
-def normed(x):
-  return(x/sp.linalg.norm(x))
 
-# visco_rolling_stats = sp.array([DescrStatsW(visco_arr[:i], weights=normed(visco_uncertainties[:i]**(-2)), ddof=0) for i in range(1,len(integrated))])
+def normed(x):
+    return x / sp.linalg.norm(x)
+
+
+# visco_rolling_stats = sp.array([DescrStatsW(visco_arr[:i], weights=normed
+# (visco_uncertainties[:i]**(-2)), ddof=0) for i in range(1,len(integrated))])
 
 # visco_rolling = sp.array([stat.mean for stat in visco_rolling_stats])
-visco_rolling = sp.array([sp.average(visco_arr[:i], weights=visco_uncertainties[:i]**(-2)) for i in range(1, len(visco_arr))])
+
+visco_rolling = sp.array(
+    [
+        sp.average(visco_arr[:i], weights=visco_uncertainties[:i] ** (-2))
+        for i in range(1, len(visco_arr))
+    ]
+)
 visco_rolling = sp.insert(visco_rolling, 0, visco_arr[0])
 visco_rolling = sp.array(visco_rolling, dtype=float)
-#Aprint('means')
+
+print('visco rolling avg')
+
+# Aprint('means')
 
 # THIS ONE DIDN'T WORK
 # visco_sem = sp.array(
@@ -149,101 +181,38 @@ visco_rolling = sp.array(visco_rolling, dtype=float)
 #     ]
 #   )**(1/2)
 
-visco_sem = sp.array([
-  (
-    (
-      sp.average(visco_arr[:i]**2, weights=visco_uncertainties[:i]**(-2))
-      - sp.average(visco_arr[:i], weights=visco_uncertainties[:i]**(-2))**2
-    )
-  )
-  for i in range(2, len(visco_arr))
-])**(1/2)
+visco_sem = sp.array(
+    [
+        (
+            (
+                sp.average(visco_arr[:i] ** 2, weights=visco_uncertainties[:i] ** (-2))
+                - sp.average(visco_arr[:i], weights=visco_uncertainties[:i] ** (-2))
+                ** 2
+            )
+        )
+        for i in range(2, len(visco_arr))
+    ]
+) ** (1 / 2)
 visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
 visco_sem = sp.insert(visco_sem, 0, visco_sem[0])
-visco_sem = sp.array(visco_sem, dtype = float)
+visco_sem = sp.array(visco_sem, dtype=float)
 
-names = sp.array(['names', 'viscosity at each timestep (from 0)', 'viscosity uncertainties', 'rolling weighted average viscosity from 0', 'SEM for rolling average viscosity'])
+print('viscosem')
 
-sp.savez_compressed('./py_output.npz', names, visco_arr, visco_uncertainties, visco_rolling, visco_sem)
+names = sp.array(
+    [
+        "names",
+        "viscosity at each timestep (from 0)",
+        "viscosity uncertainties",
+        "rolling weighted average viscosity from 0",
+        "SEM for rolling average viscosity",
+        "original autocorrelation function (and uncertainties)"
+    ]
+)
 
-def plotter():
+print('saving')
 
-  xarr = sp.arange(0,len(stress_autocor))*stepsize
-
-  plt.figure()
-  plt.plot(stress,'.k',alpha=0.1)
-  # plt.plot(stressuncertainty,'r',alpha=0.5)
-  plt.plot(stressmean)
-  plt.title('Off-Diagonal Pressure')
-  plt.ylabel('$P_{xy}$ (bar)')
-  plt.xlabel('timestep')
-  plt.savefig(xvgplace+'Pxy.png')
-  # plt.show()
-
-  ##################################################
-
-  plt.figure()
-  plt.plot(xarr, stress_autocor[:,0],color='#999999',label='autocorrelation')
-  plt.plot(xarr, movingavg, label='rolling average over 25 frames (25ps)')
-  plt.ylim(-200,200)
-  plt.title('$P_{xy}$ autocorrelation')
-  plt.ylabel('$(bar^2)$')
-  plt.xlabel('$\Delta\,\\tau$ (sec)')
-  plt.xlim(-0.2E-10,0.5E-9)
-  plt.legend()
-  # plt.show()
-  plt.savefig(xvgplace+'stress-autocor-zoom.png')
-
-  # plt.plot(xarr, stress_autocor[:,0],color='#999999',label='autocorrelation')
-  # plt.plot(xarr, movingavg, label='rolling average over 25 frames (25ps)')
-  # plt.plot(xarr, sp.ones_like(xarr))
-  plt.ylim(-2000,2000)
-  # plt.title('$P_{xy}$ autocorrelation')
-  # plt.ylabel('$(bar^2)$')
-  # plt.xlabel('$\Delta\,\\tau$ (sec)')
-  plt.legend()
-  plt.xlim()
-  # plt.xlim(-1E-11,21E-11)
-  # plt.show()
-  plt.savefig(xvgplace+'stress-autocor.png')
-
-  ##################################################
-
-  plt.figure()
-  # imean = sp.mean(integrated)
-  # istd = sp.std(integrated)
-  # plt.plot(xarr, integrated * viscosityfactor, '-', c='C0', alpha = 0.2,label='viscosity')
-  # plt.plot(xarr, meanlist * viscosityfactor, '-', c='C1', alpha = 0.2,
-  #   label='average viscosity from $\Delta\\tau$=0')
-  # plt.fill_between(xarr, (integrated+unclist) * viscosityfactor,
-  #   (integrated-unclist) * viscosityfactor, alpha = 0.2, color='C0')
-  # plt.fill_between(xarr, (meanlist+stdlist) * viscosityfactor,
-  #   (meanlist-stdlist) * viscosityfactor, alpha = 0.2, color='C1')
-
-  plt.plot(xarr, visco_arr, '-', c='C0')
-  plt.fill_between(xarr, visco_arr+visco_uncertainties, visco_arr-visco_uncertainties, color='C0', alpha=0.2)
-
-  # plt.plot(xarr, visco_rolling, '-', c='C1')
-  plt.fill_between(xarr, visco_rolling+visco_sem, visco_rolling-visco_sem, color='C1', alpha=1)
-
-  # plt.plot([0,2E-8],sp.array([1,1])*19.68E-11,'--',c='black',
-  #   label='previous measurement')
-  # plt.fill_between([0,2E-8],
-  #                 sp.array([1,1])*(19.68-0.69)*1E-11,
-  #                 sp.array([1,1])*(19.68+0.69)*1E-11,
-  #                 alpha = 0.1, color='black')
-
-  plt.title('Green Kubo')
-  plt.ylabel('Viscosity $(Pa\cdot m\cdot s)$')
-  plt.xlabel('$\Delta\\tau$ (sec)')
-  plt.xscale('log')
-  plt.xlim(xarr[1]/1.01,xarr[-1]*1.1)
-  plt.ylim(0,0.5e-9)
-
-  plt.legend(loc=0)
-  plt.savefig(xvgplace+'visco-integral.png')
-  plt.show()
-
-
-
-#plotter()
+sp.savez_compressed(
+    "./py_output_shift.npz", names, visco_arr, visco_uncertainties,
+    visco_rolling, visco_sem, stress_autocor
+)
