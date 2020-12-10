@@ -1,6 +1,7 @@
 import scipy as sp
 from scipy import stats
 import pandas as pd
+import numpy as np
 # import MDAnalysis as mda
 # import re
 # import json
@@ -18,54 +19,29 @@ print(0)
 open('./grompp.txt', 'w').close()
 
 for lipid in [
-  'dmpc-8nm',
-  'dmpc-12nm',
-  'dmpc-15nm',
-]:
+  'psm'
+  ]:
+
   print(lipid)
   lipidfolder = lipid
   print(lipidfolder)
-  colnames = ['t','x','y','z']
 
-  box1 = pd.read_table(lipidfolder+'/r1/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
-  print('r1')
-  box2 = pd.read_table(lipidfolder+'/r2/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
-  print('r2')
-  box3 = pd.read_table(lipidfolder+'/r3/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
-  print('r3')
-  box4 = pd.read_table(lipidfolder+'/r4/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
-  print('r4')
-  box5 = pd.read_table(lipidfolder+'/r5/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
-  print('r5')
+  for i in range(1,6):
+    colnames = ['t', 'x', 'y', 'z']
+    boxi = pd.read_table(lipidfolder+f'/r{i}/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
 
-  allbox = pd.concat([box1,box2,box3,box4,box5])
+    targetx = sp.mean(boxi.x)
+    targetz = sp.mean(boxi.z)
 
-  targetx = sp.mean(allbox.x)
-  targetz = sp.mean(allbox.z)
-
-  # with open(lipidfolder+'/targetvals.txt','w') as f:
-  #    f.write(str(targetx)+'\t'+str(targetz))
-
-
-
-  bestarr = sp.zeros((5),dtype=int)
-  for b, box in enumerate([box1,box2,box3,box4,box5]):
+    bestarr = sp.zeros((5),dtype=int)
     minerror = 100
-    for frame in range(100,len(box)):
-      thiserror = finderror(box.x[frame],box.z[frame])
+    for frame in len(boxi):
+      thiserror = finderror(boxi.x[frame], boxi.z[frame])
       if thiserror < minerror:
         bestarr[b] = frame
         minerror = thiserror
-        # print(bestarr[b],minerror)
 
-  bestarr *= box1.t[1]
-  # print(bestarr)
-
-  # with open(lipidfolder+'/bestndx.txt', 'w') as f:
-  #    for i in range(5):
-  #       f.write(str(bestarr[i])+'\n')
-
-  # gmx grompp -f r1/gromacs/step7_boxsize.mdp -t r1/gromacs/step7_boxsize.trr -time 160.0 -o r1/gromacs/ZZZstep8_nvt.tpr -c r1/gromacs/step6.6_equilibration.gro -n  r1/gromacs/index.ndx -p r1/gromacs/topol.top
+  bestarr *= boxi.t[1]
   nvtfolder = lipid
 
   with open('./grompp.txt', 'a') as f:
