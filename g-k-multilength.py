@@ -3,9 +3,7 @@ import numpy as np
 import scipy as sp
 from scipy import stats
 from scipy import signal
-# import matplotlib.pyplot as plt
-# from statsmodels.stats.weightstats import DescrStatsW
-from scipy import linalg
+# import matplotlib.pyplot as plt #NOTE remove this before running on shit
 
 #Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
 
@@ -53,6 +51,11 @@ stepsize = bigpressure['time (s)'][1] * 10**(-12)
 print("stepsize =", stepsize, "s")
 
 def subsampler(nn = 1, npz_name = 'py_output.npz'):
+  '''
+  This takes the output trajectory and makes a subsampled 'lower resolution'
+  copy. *yes. i absolutely could have used this for the normal shit.*
+  '''
+
   #make stress tensor
   print('just some simple manipulations')
   # actually use 10000

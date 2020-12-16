@@ -2,10 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy as sp
 from scipy import signal
-# from scipy import stats
-import matplotlib.pyplot as plt
-# from statsmodels.stats.weightstats import DescrStatsW
-# from scipy import linalg
+
 
 #Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
 
@@ -37,11 +34,14 @@ print('importing height')
 height_v = pd.read_csv(heightname, skiprows=17, header=None, delim_whitespace=True, dtype=np.float)
 height_v.columns = ['t','x','y','z']
 
-stepsize = bigpressure['time (ps)'][1] * 10**(-12)
+stepsize = bigpressure['time (s)'][1] * 10**(-12)
 print("stepsize =", stepsize, "s")
 
 
 def main():
+  """
+  This is the basic. What I want. Anything further should be developed using this code.
+  """
   stress = np.mean([bigpressure.xy, bigpressure.yx], axis=0)
   print('\nlen stress', len(stress))
   print('mean stress (Pa) =', np.mean(stress)*10**5)
@@ -100,3 +100,5 @@ def main():
     stress_autocor[::nn],
     visco_arr[::nn],
     )
+
+main()
