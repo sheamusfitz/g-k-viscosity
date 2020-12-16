@@ -1,8 +1,8 @@
-pwd = '/scratch/07324/sheafitz/wdepths/'
-lipids = ['dmpc-8nm', 'dppc-12nm', 'dppc-15nm']
+pwd = '/scratch/07324/sheafitz/visco-fluc/'
+lipids = ['psm']
 
 
-with open('./manylaunch.bat', 'w') as f:
+with open('./nvt-launch.bat', 'w') as f:
 
   #TODO okay shea figure out what you're doing here this is a mess.
 

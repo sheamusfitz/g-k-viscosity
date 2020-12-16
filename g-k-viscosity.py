@@ -1,19 +1,21 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import scipy as sp
-from scipy import stats
 from scipy import signal
-# import matplotlib.pyplot as plt
+# from scipy import stats
+import matplotlib.pyplot as plt
 # from statsmodels.stats.weightstats import DescrStatsW
-from scipy import linalg
+# from scipy import linalg
 
 #Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
 
 # xvgname = '../nvt_analysis/pressure.xvg'
 # heightname = '../nvt_analysis/thickness.xvg'
 # struct_filename = '../step7_short.gro'
+# #Aprint(xvgplace)
 
 xvgname = './pressure-tensor.xvg'
+xvgplace = ''.join(xvgname.partition('/')[:-1])
 heightname = './thickness.xvg'
 struct_filename = './step8_nvt.gro'
 with open(struct_filename) as f:
@@ -25,55 +27,36 @@ for i,size in enumerate(sizes):
 
 print("importing...")
 bigpressure = pd.read_csv(xvgname,
-                          skiprows=26,
-                          header=None, delim_whitespace=True, dtype=np.float,
-                          low_memory=False)
+                          skiprows=33,
+                          header=None, delim_whitespace=True)
 
 bigpressure.columns = ['time (s)', 'temp', 'xy', 'yx']
-
-# print(np.mean(bigpressure.xy))
-
-# @ s0 legend "Temperature"
-# @ s1 legend "Pres-XX"
-# @ s2 legend "Pres-XY"
-# @ s3 legend "Pres-XZ"
-# @ s4 legend "Pres-YX"
-# @ s5 legend "Pres-YY"
-# @ s6 legend "Pres-YZ"
-# @ s7 legend "Pres-ZX"
-# @ s8 legend "Pres-ZY"
-# @ s9 legend "Pres-ZZ"
 
 print('importing height')
 
 height_v = pd.read_csv(heightname, skiprows=17, header=None, delim_whitespace=True, dtype=np.float)
 height_v.columns = ['t','x','y','z']
 
-stepsize = bigpressure['time (s)'][1] * 10**(-12)
+stepsize = bigpressure['time (ps)'][1] * 10**(-12)
 print("stepsize =", stepsize, "s")
 
-def subsampler(nn = 1, npz_name = 'py_output.npz'):
-  #make stress tensor
-  print('just some simple manipulations')
-  # actually use 10000
-  stress = np.mean([bigpressure.xy[::nn], bigpressure.yx[::nn]], axis=0)
-  stress = stress - np.mean(stress)
-  print('len stress', len(stress))
 
+def main():
+  stress = np.mean([bigpressure.xy, bigpressure.yx], axis=0)
+  print('\nlen stress', len(stress))
+  print('mean stress (Pa) =', np.mean(stress)*10**5)
   print('mean stress^2 (Pa^2) =', np.mean(stress**2)*10**10)
 
   thickness = np.absolute(np.mean(height_v.z)) * 10**(-9)
-  # thicksem = sp.stats.sem(height_v.z) * 10**(-9)
-  print('thickness =', thickness, "m")
+  print('\nthickness =', thickness, "m")
 
-  #  this all seems wrong to me... i'll fix it here we go:
-  temp = bigpressure['temp'][::nn].mean()
-  # tempsem = sp.stats.sem(bigpressure['temp'][::nn])
-  print("temperature =",temp,"K")
+  temp = bigpressure['temp'].mean()
+  print("\ntemperature =",temp,"K")
 
-  boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27 # volume in m^3
-  print("boxvol =", boxvol, "m^3")
-  print('autocor')
+  boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27
+  print("\nboxvol =", boxvol, "m^3")
+  print("\ncalculating autocor")
+
 
   def autocor(sig):
     return(
@@ -83,75 +66,7 @@ def subsampler(nn = 1, npz_name = 'py_output.npz'):
 
   stress_autocor = autocor(stress)
 
-  print('integrating')
-
-  integrated = np.cumsum(stress_autocor)
-
-  viscosityfactor = (
-    10**10                  #bar^2 to Pa^2
-    * stepsize*nn
-    * boxvol
-    * (1.38064852 * 10**-23)**(-1) #1/k_B
-  )
-
-  visco_arr = viscosityfactor / temp * thickness * integrated
-
-  print('saving')
-
-  names = np.array([
-    'names',
-    'times',
-    'xy stress autocorrelation',
-    'viscosity at each timestep (from 0)',
-    ])
-
-  mm = np.max((1, int(len(stress_autocor)//1e6)))
-
-  print('mm', mm)
-  print('len(stress_autocor)', len(stress_autocor))
-
-  np.savez_compressed(
-    './'+npz_name,
-    names,
-    bigpressure['time (s)'][::nn*mm],
-    stress_autocor[::mm],
-    visco_arr[::mm],
-    )
-
-
-def trunc_integ(maxi = 100000, npz_name = 'py_output.npz'):
-  maxi = int(maxi)
-  #make stress tensor
-  print('just some simple manipulations')
-  # actually use 10000
-  stress = np.mean([bigpressure.xy[:maxi], bigpressure.yx[:maxi]], axis=0)
-  stress = stress - np.mean(stress)
-  print('len stress', len(stress))
-
-  print('mean stress^2 (Pa^2) =', np.mean(stress**2)*10**10)
-
-  thickness = np.absolute(np.mean(height_v.z)) * 10**(-9)
-  # thicksem = sp.stats.sem(height_v.z) * 10**(-9)
-  print('thickness =', thickness, "m")
-
-  #  this all seems wrong to me... i'll fix it here we go:
-  temp = bigpressure['temp'][:maxi].mean()
-  # tempsem = sp.stats.sem(bigpressure['temp'][::nn])
-  print("temperature =",temp,"K")
-
-  boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27 # volume in m^3
-  print("boxvol =", boxvol, "m^3")
-  print('autocor')
-
-  def autocor(sig):
-    return(
-      sp.signal.correlate(sig, sig, mode='full')[len(sig)-1:] / 
-      np.arange(len(sig)+1,1,-1)
-    )
-
-  stress_autocor = autocor(stress)
-
-  print('integrating')
+  print("\nintegrating")
 
   integrated = np.cumsum(stress_autocor)
 
@@ -161,10 +76,10 @@ def trunc_integ(maxi = 100000, npz_name = 'py_output.npz'):
     * boxvol
     * (1.38064852 * 10**-23)**(-1) #1/k_B
   )
-
+  
   visco_arr = viscosityfactor / temp * thickness * integrated
-
-  print('saving')
+  
+  print("\nsaving")
 
   names = np.array([
     'names',
@@ -173,27 +88,15 @@ def trunc_integ(maxi = 100000, npz_name = 'py_output.npz'):
     'viscosity at each timestep (from 0)',
     ])
 
-  mm = np.max((1, int(len(stress_autocor)//1e6)))
+  print('\nlen(stress_autocor)', len(stress_autocor))
 
-  print('mm', mm)
-  print('len(stress_autocor)', len(stress_autocor))
+  nn = 1000
+  print(f"saving every {nn} timesteps, which is every {nn*stepsize*10**12} picoseconds")
 
   np.savez_compressed(
-    './'+npz_name,
+    './py_output.npz',
     names,
-    bigpressure['time (s)'][:maxi:mm],
-    stress_autocor[::mm],
-    visco_arr[::mm],
+    bigpressure['time (s)'][::nn],
+    stress_autocor[::nn],
+    visco_arr[::nn],
     )
-
-for ns in np.linspace(1, 196, 6):
-  trunc_integ(maxi=ns*1000/0.002, npz_name=f'{ns}ns_sim.npz')
-
-
-# if stepsize==2e-15:
-#   subsampler(nn=1000, npz_name='pico_autocor.npz')
-#   subsampler(nn=1, npz_name='femto_autocor.npz')
-# elif stepsize==2e-12:
-#   subsampler(nn=1, npz_name='pico_autocor.npz')
-# else:
-#   subsampler(nn=1, npz_name='py_output.npz')

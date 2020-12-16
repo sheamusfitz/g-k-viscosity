@@ -25,20 +25,19 @@ for lipid in [
   print(lipid)
   lipidfolder = lipid
   print(lipidfolder)
-
+  bestarr = sp.zeros((5),dtype=int)
+  colnames = ['t', 'x', 'y', 'z']
   for i in range(1,6):
-    colnames = ['t', 'x', 'y', 'z']
-    boxi = pd.read_table(lipidfolder+f'/r{i}/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames)
+    boxi = pd.read_csv(lipidfolder+f'/r{i}/box.xvg', header=None, skiprows=29, usecols=[1,2,3,4], names=colnames, sep='\t')
 
     targetx = sp.mean(boxi.x)
     targetz = sp.mean(boxi.z)
 
-    bestarr = sp.zeros((5),dtype=int)
     minerror = 100
-    for frame in len(boxi):
+    for frame in range(len(boxi)):
       thiserror = finderror(boxi.x[frame], boxi.z[frame])
       if thiserror < minerror:
-        bestarr[b] = frame
+        bestarr[i-1] = frame
         minerror = thiserror
 
   bestarr *= boxi.t[1]
