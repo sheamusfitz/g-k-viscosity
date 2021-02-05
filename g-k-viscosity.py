@@ -34,15 +34,22 @@ print('importing height')
 height_v = pd.read_csv(heightname, skiprows=17, header=None, delim_whitespace=True, dtype=np.float)
 height_v.columns = ['t','x','y','z']
 
-stepsize = bigpressure['time (s)'][1] * 10**(-12)
+stepsize = (bigpressure['time (s)'][1]-bigpressure['time (s)'][0]) * 10**(-12)
 print("stepsize =", stepsize, "s")
 
+def main(datapoints = 1000000):
+  """
+  This is the basic algorithm. It takes 'thickness.xvg', 'step8_nvt.gro', 'pressure-tensor.xvg' and outputs an npz file with times, the autocorrelation function, and the viscosity as a function of time. Anything further should be developed using this code.
 
-def main():
+  Optional keyword arguments:
+
+  datapoints: sets (roughly) the number of data points in the output file. Set to 0 to output the entire series.
+
+  ---sheamusfitz
   """
-  This is the basic. What I want. Anything further should be developed using this code.
-  """
+
   stress = np.mean([bigpressure.xy, bigpressure.yx], axis=0)
+  stress = stress - np.mean(stress)
   print('\nlen stress', len(stress))
   print('mean stress (Pa) =', np.mean(stress)*10**5)
   print('mean stress^2 (Pa^2) =', np.mean(stress**2)*10**10)
@@ -90,7 +97,11 @@ def main():
 
   print('\nlen(stress_autocor)', len(stress_autocor))
 
-  nn = 1000
+  if datapoints==0:
+    nn = 1
+  else:
+    nn = max(len(bigpressure)//datapoints,1)
+
   print(f"saving every {nn} timesteps, which is every {nn*stepsize*10**12} picoseconds")
 
   np.savez_compressed(
