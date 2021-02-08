@@ -53,7 +53,10 @@ print("stepsize =", stepsize, "s")
 def subsampler(nn = 1, npz_name = 'py_output.npz'):
   '''
   This takes the output trajectory and makes a subsampled 'lower resolution'
-  copy. *yes. i absolutely could have used this for the normal shit.*
+  copy. On second thought, there's no need to merge this with 
+  `g-k-viscosity.py`: this is not part of the analysis i'll often need (or 
+  probably need ever again), in which I "manually" create a lower resolution
+  output trajectory and analyze that instead.
   '''
 
   #make stress tensor
