@@ -37,6 +37,26 @@ height_v.columns = ['t','x','y','z']
 stepsize = (bigpressure['time (s)'][1]-bigpressure['time (s)'][0]) * 10**(-12)
 print("stepsize =", stepsize, "s")
 
+def water_visc(temp):
+  a = 6.0097e-5
+  b = 363.741484
+  c = 79.9472888
+  return(a * np.exp(b/(temp - c)))
+
+def water_correction(eta_tot_arr, H, h, temp):
+  """
+  This takes the viscosity integral η(t) of the entire system and corrects it
+    for the water viscosity as a function of temperature.
+  **inputs**
+  eta_tot_arr:  the viscosity integral
+  H:            Box-Z dimension
+  h:            membrane thickness (z)
+  temp:         system temperature
+  """
+  return(H * eta_tot_arr - (H-h) * water_visc(temp))
+  #TODO I need to actually put this in main() somewhere
+
+
 def main(datapoints = 1000000):
   """
   This is the basic algorithm. It takes 'thickness.xvg', 'step8_nvt.gro', 'pressure-tensor.xvg' and outputs an npz file with times, the autocorrelation function, and the viscosity as a function of time. Anything further should be developed using this code.
@@ -67,7 +87,7 @@ def main(datapoints = 1000000):
 
   def autocor(sig):
     return(
-      sp.signal.correlate(sig, sig, mode='full')[len(sig)-1:] / 
+      signal.correlate(sig, sig, mode='full')[len(sig)-1:] / 
       np.arange(len(sig)+1,1,-1)
     )
 
@@ -84,7 +104,9 @@ def main(datapoints = 1000000):
     * (1.38064852 * 10**-23)**(-1) #1/k_B
   )
   
-  visco_arr = viscosityfactor / temp * thickness * integrated
+  visco_total = viscosityfactor / temp * integrated * sizes[2]
+
+  visco_arr = water_correction(visco_total, sizes[2], thickness, temp) 
   
   print("\nsaving")
 
