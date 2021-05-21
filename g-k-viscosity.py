@@ -1,7 +1,24 @@
 import numpy as np
 import pandas as pd
-import scipy as sp
+# import scipy as sp
 from scipy import signal
+
+import argparse
+
+# I want to add an option to also save the fourier transform of the autocorrelation function.
+# Initialize the parser
+parser = argparse.ArgumentParser()
+# create argument
+parser.add_argument("-f", "--fft", help = "Output fourier transform of autocorrelation function", action="store_true")
+
+
+
+
+# read argument from command line
+args = parser.parse_args()
+
+
+
 
 
 #Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
@@ -20,7 +37,7 @@ with open(struct_filename) as f:
 #Aprint(sizeline)
 sizes = sizeline.split()
 for i,size in enumerate(sizes):
-  sizes[i] = float(size)
+  sizes[i] = float(size) * 10**(-9)
 
 print("importing...")
 bigpressure = pd.read_csv(xvgname,
@@ -54,7 +71,6 @@ def water_correction(eta_tot_arr, H, h, temp):
   temp:         system temperature
   """
   return(H * eta_tot_arr - (H-h) * water_visc(temp))
-  #TODO I need to actually put this in main() somewhere
 
 
 def main(datapoints = 1000000):
@@ -80,7 +96,7 @@ def main(datapoints = 1000000):
   temp = bigpressure['temp'].mean()
   print("\ntemperature =",temp,"K")
 
-  boxvol = sizes[0]*sizes[1]*sizes[2] * 10**-27
+  boxvol = sizes[0]*sizes[1]*sizes[2]
   print("\nboxvol =", boxvol, "m^3")
   print("\ncalculating autocor")
 
@@ -104,7 +120,9 @@ def main(datapoints = 1000000):
     * (1.38064852 * 10**-23)**(-1) #1/k_B
   )
   
-  visco_total = viscosityfactor / temp * integrated * sizes[2]
+  # in the following line, the "sizes[2]" part was removed, because that gets
+  # factored in with the 'water_correction()' function.
+  visco_total = viscosityfactor / temp * integrated # * sizes[2]
 
   visco_arr = water_correction(visco_total, sizes[2], thickness, temp) 
   
@@ -132,6 +150,12 @@ def main(datapoints = 1000000):
     bigpressure['time (s)'][::nn],
     stress_autocor[::nn],
     visco_arr[::nn],
+    )
+
+  if args.fft:
+    np.savez_compressed(
+      './autocor_fft.npz',
+      np.fft.fft(stress_autocor)
     )
 
 main()
