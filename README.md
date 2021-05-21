@@ -1,9 +1,6 @@
 # branches
 
-## fft
-
-this branch has the analysis of the fourier transform of the autocorrelation function. the jupyter notebook is very complicated to merge between versions, unfortunately.
-
+*put new branches here*
 
 ## combine-multilength-viscosity
 
