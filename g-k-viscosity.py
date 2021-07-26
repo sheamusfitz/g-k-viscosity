@@ -126,6 +126,16 @@ def main(datapoints = 1000000):
 
   visco_arr = water_correction(visco_total, sizes[2], thickness, temp) 
   
+  vitals = {}
+
+  vitals['integration factor'] = viscosityfactor
+  vitals['step size'] = stepsize
+  vitals['box volume'] = boxvol
+  vitals['temperature'] = temp
+  vitals['bilayer thickness'] = thickness
+  vitals['mean stress'] = np.mean(stress)*10**5
+  vitals['mean square stress'] = np.mean(stress**2) *10**10
+
   print("\nsaving")
 
   names = np.array([
@@ -144,6 +154,7 @@ def main(datapoints = 1000000):
 
   print(f"saving every {nn} timesteps, which is every {nn*stepsize*10**12} picoseconds")
 
+  np.save('./system_info.npy', vitals)
   np.savez_compressed(
     './py_output.npz',
     names,
