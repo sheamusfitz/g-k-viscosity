@@ -19,7 +19,12 @@ print(0)
 open('./grompp.txt', 'w').close()
 
 for lipid in [
-  'psm'
+  'popc-329',
+  'dopc-329',
+  'dmpc-329',
+  'dlpc-329',
+  'dlpc-286',
+  'dapc-329',
   ]:
 
   print(lipid)
