@@ -11,15 +11,8 @@ parser = argparse.ArgumentParser()
 # create argument
 parser.add_argument("-f", "--fft", help = "Output fourier transform of autocorrelation function", action="store_true")
 
-
-
-
 # read argument from command line
 args = parser.parse_args()
-
-
-
-
 
 #Aprint('NOTE: this does not yet account for the water viscosity or the thickness of the membrane *relative* to the box.')
 
@@ -141,8 +134,9 @@ def main(datapoints = 1000000):
   names = np.array([
     'names',
     'times',
-    'xy stress autocorrelation',
-    'viscosity at each timestep (from 0)',
+    'xy stress autocorrelation skipping',
+    'xy stress autocorrelation beginning'
+    'viscosity integral (from t=0)',
     ])
 
   print('\nlen(stress_autocor)', len(stress_autocor))
@@ -160,6 +154,7 @@ def main(datapoints = 1000000):
     names,
     bigpressure['time (s)'][::nn],
     stress_autocor[::nn],
+    stress_autocor[:datapoints],
     visco_arr[::nn],
     )
 
