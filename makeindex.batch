@@ -1,0 +1,24 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=128
+#SBATCH -J makeindex
+#SBATCH -t 00:10:00
+#SBATCH -p RM
+
+#SBATCH --mail-user=sheafitz@udel.edu
+#SBATCH --mail-type=ALL
+#SBATCH -o %x-%j.out
+#SBATCH -e %x-%j.err
+
+#Adjust N and ntasks-per-node above according to your needs.
+#
+# Setup the module command
+set echo
+set -x
+
+# Load the needed modules
+module load gromacs/2020.2-cpu
+cd $SLURM_SUBMIT_DIR
+
+bash makeindex.sh

@@ -1,0 +1,22 @@
+#!/bin/bash
+#SBATCH -N 5
+#SBATCH --tasks-per-node=64
+#SBATCH --cpus-per-task=2
+#SBATCH -J boxsize
+#SBATCH -t 48:00:00
+#SBATCH -p RM
+
+#SBATCH --mail-user=youremail@email.email
+#SBATCH --mail-type=ALL
+#SBATCH -o %x-%j.out
+#SBATCH -e %x-%j.err
+
+module load intel/18.0.2
+module load impi/18.0.2
+module load gromacs
+
+mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
+mpirun -n 64 -o 64 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
+mpirun -n 64 -o  gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
+mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
+mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &

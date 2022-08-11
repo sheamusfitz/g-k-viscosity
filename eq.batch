@@ -1,0 +1,33 @@
+#!/bin/bash
+# note: this is set up for Bridges2
+#SBATCH -N 1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=64
+#SBATCH -J POPC-eq
+#SBATCH -t 00:10:00
+#SBATCH -p RM
+
+#SBATCH --mail-user=your_email@udel.eduu
+#SBATCH --mail-type=all # these two lines will email you when the job is submitted, cancelled, starts, copmletes, or ends with an error
+#SBATCH -o %x-%j.out
+#SBATCH -e %x-%j.err    # these two lines make "output" and "error" files named like: "jobname-jobnumber.out/.err"
+
+set echo
+set -x
+
+# load modules
+module load intel/18.0.2
+module load impi/18.0.2
+module load gromacs
+
+# move to directory, launch thing, repeat
+cd $PROJECT/where-you-keep-the-files/POPC/r1/
+csh README
+cd $PROJECT/where-you-keep-the-files/POPC/r2/
+csh README
+cd $PROJECT/where-you-keep-the-files/POPC/r3/
+csh README
+cd $PROJECT/where-you-keep-the-files/POPC/r4/
+csh README
+cd $PROJECT/where-you-keep-the-files/POPC/r5/
+csh README
