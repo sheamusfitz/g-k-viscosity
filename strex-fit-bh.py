@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
 import json
+import time
 
 # from statsmodels.stats.weightstats import DescrStatsW
 # import cellbell
@@ -51,9 +52,7 @@ gamma_model = lf.Model(gamma_fit, independent_vars='t')
 
 
 def gamma_limit(a, b, t0):
-    a = 10**a
-    #     t0 = 10**t0
-    return(a)
+    return(10**a)
 
 
 def log_uniform(min, max, n):
@@ -136,15 +135,14 @@ for lipid in lipids329:
             integrals329.columns.str.contains(lipid)).dropna()
     ], axis=1)
 
-mint = 20
-maxt = 8000
-num = 1000
-log_inds = np.unique(np.logspace(
-    np.log10(mint), np.log10(maxt), num=num, dtype=int))
-# log_inds = np.arange(mint, maxt)
+# mint = 10
+# maxt = 8000*20*2
+# num = 50000
+# log_inds = np.unique(np.logspace(
+# np.log10(mint), np.log10(maxt), num=num, dtype=int))
+# log_inds = np.linspace(mint, maxt, num, dtype=int)
 # display(log_inds)
-print(len(log_inds))
-
+# print(len(log_inds), log_inds[:3], log_inds[-3:])
 
 ##################################################
 
@@ -155,37 +153,28 @@ except:
 
 ##################################################
 
-nsteps = 200000  # 200000 # 40000 # psm used 4500*50 = 225000
-# to get rid of the autocorrelation error, use AT LEAST 22969*50
-nwalkers = 32  # 24  was pretty good #64, 16 for testing
-
-##################################################
-##################################################
-##################################################
-##################################################
-##################################################
-
 gamma_params = gamma_model.make_params()
 
 # gamma_params.add('a', min = -100, max = 0, vary = True)
 # gamma_params.add('b', min = 1, max = 70)
 # gamma_params.add('t0', min = -2, max = 0, vary = True)
 
-gamma_params.add('a',  min=-11,   max=-8)    # 1e-11, 1e-8
-gamma_params.add('b',  min=3,       max=18)      # 3, 18
-gamma_params.add('t0', min=-10,   max=-1)     # 1e-10, 1e-1
+gamma_params.add('a',  min=-12,   max=-6, value=-10)    # 1e-11, 1e-8
+gamma_params.add('b',  min=2,     max=20, value=6)      # 3, 18
+gamma_params.add('t0', min=-15,   max=5,  value=-2)     # 1e-10, 1e-1
 
-initials = np.array([
-    log_uniform(gamma_params['a'].min, gamma_params['a'].max, nwalkers),
-    np.random.uniform(gamma_params['b'].min, gamma_params['b'].max, nwalkers),
-    log_uniform(gamma_params['t0'].max, gamma_params['t0'].min, nwalkers)
-]).T
+# initials = np.array([
+#     log_uniform(gamma_params['a'].min, gamma_params['a'].max, nwalkers),
+#     np.random.uniform(gamma_params['b'].min, gamma_params['b'].max, nwalkers),
+#     log_uniform(gamma_params['t0'].max, gamma_params['t0'].min, nwalkers)
+# ]).T
 
 
 ##################################################
 # lip = '283'  # ['283', '293', '303', '313', '323', 'dlpc', 'dopc', 'dppc', 'dspc']
 ##################################################
 for r in range(1, 6):
+    starttime = time.time()
     print(thelipid)
     if 0 <= thelipid <= 8:
         lip = ['283', '293', '303', '313', '323',
@@ -200,14 +189,26 @@ for r in range(1, 6):
         uncs = integ329_std[lip]
         means = integ329_mean[lip]
         thesetimes = times329
+    mint = np.abs(thesetimes - 3).argmin() + 1
+    maxt = np.abs(thesetimes - 5000).argmin() + 1
+    print(mint, maxt)
+    # log_inds = np.unique(np.logspace(
+    #     np.log10(mint), np.log10(len(thesetimes)), num=50000, dtype=int))
+    log_inds = np.unique(np.logspace(
+        np.log10(mint), np.log10(maxt), num=50000, dtype=int))
     print(lip, r)
     results[f'{thelipid}-r{r}'] = \
         gamma_model.fit(this_integral[log_inds], gamma_params, t=thesetimes[log_inds],
-                        method='emcee', weights=uncs[log_inds]**-1,
-                        fit_kws={'nwalkers': nwalkers, 'steps': nsteps,  # 10000
-                                 'pos': initials, 'workers': 16, 'progress': False},
+                        method='basinhopping', weights=uncs[log_inds]**-2,
+                        # fit_kws={'nwalkers': nwalkers, 'steps': nsteps,  # 10000
+                        #          'pos': initials, 'workers': 16, 'progress': False},
                         calc_covar=True
                         )
+
+    dur = time.time()-starttime
+    durm = int(dur//60)
+    durs = int(dur % 60)
+    print(f'fitting time: {durm}m{durs}s')
 
     ##################################################
 
@@ -255,34 +256,31 @@ for r in range(1, 6):
     try:
         output_params[lip]['viscs'].shape
     except:
-        output_params[lip]['viscs'] = np.zeros((5, 2))
+        output_params[lip]['viscs'] = np.zeros(5)
 
     try:
         output_params[lip]['mrt'].shape
     except:
-        output_params[lip]['mrt'] = np.zeros((5, 2))
+        output_params[lip]['mrt'] = np.zeros(5)
 
     try:
         output_params[lip]['t0']
     except:
-        output_params[lip]['t0'] = np.zeros((5, 2))
+        output_params[lip]['t0'] = np.zeros(5)
 
     try:
         output_params[lip]['b']
     except:
-        output_params[lip]['b'] = np.zeros((5, 2))
+        output_params[lip]['b'] = np.zeros(5)
 
     output_params[lip]['viscs'][r - 1] = (
-        results[f'{thelipid}-r{r}'].params['a'].value+this_integral[0],
-        results[f'{thelipid}-r{r}'].params['a'].stderr
+        10**results[f'{thelipid}-r{r}'].params['a'].value + this_integral[0]
     )
     output_params[lip]['b'][r - 1] = (
-        results[f'{thelipid}-r{r}'].params['b'].value,
-        results[f'{thelipid}-r{r}'].params['b'].stderr
+        results[f'{thelipid}-r{r}'].params['b'].value
     )
     output_params[lip]['t0'][r - 1] = (
-        results[f'{thelipid}-r{r}'].params['t0'].value,
-        results[f'{thelipid}-r{r}'].params['t0'].stderr
+        10**results[f'{thelipid}-r{r}'].params['t0'].value
     )
 
 try:
@@ -301,22 +299,22 @@ except:
 
 print('------------------------------')
 
-output_combined[lip]['mean visc'] = np.average(
-    output_params[lip]['viscs'][:, 0],
-    weights=output_params[lip]['viscs'][:, 1]**-2
-)
-output_combined[lip]['visc unc'] = weighted_unc(output_params[lip]['viscs'])
+# output_combined[lip]['mean visc'] = np.average(
+#     output_params[lip]['viscs'][:, 0],
+#     weights=output_params[lip]['viscs'][:, 1]**-2
+# )
+# output_combined[lip]['visc unc'] = weighted_unc(output_params[lip]['viscs'])
 #
+
+output_combined[lip]['mean visc'] = np.mean(output_params[lip]['viscs'])
+output_combined[lip]['visc unc'] = stats.sem(output_params[lip]['viscs'])
+
 #
-output_combined[lip]['mean t0'] = np.average(
-    output_params[lip]['t0'][:, 0],
-    weights=output_params[lip]['t0'][:, 1]**-2)
-output_combined[lip]['t0 unc'] = weighted_unc(output_params[lip]['t0'])
+output_combined[lip]['mean t0'] = np.mean(output_params[lip]['t0'])
+output_combined[lip]['t0 unc'] = stats.sem(output_params[lip]['t0'])
 ##
-output_combined[lip]['mean b'] = np.average(
-    output_params[lip]['b'][:, 0],
-    weights=output_params[lip]['b'][:, 1]**-2)
-output_combined[lip]['b unc'] = weighted_unc(output_params[lip]['b'])
+output_combined[lip]['mean b'] = np.mean(output_params[lip]['b'])
+output_combined[lip]['b unc'] = stats.sem(output_params[lip]['b'])
 
 with open(f'{lip}-{thelipid}-results.txt', 'a') as f:
     f.write(f"\n\n\n{lip.upper()} Results:")
