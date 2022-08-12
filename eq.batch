@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node 1
 #SBATCH --array=1-5
 #SBATCH -t 07:00:00
-#SBATCH --mail-user=sheafitz@udel.edu
+# SBATCH --mail-user=email@.email.email
 #SBATCH --mail-type=all
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err

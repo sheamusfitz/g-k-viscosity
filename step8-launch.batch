@@ -1,0 +1,28 @@
+#!/bin/bash
+#SBATCH -N 3
+#SBATCH --tasks-per-node=64
+#SBATCH --cpus-per-task=2
+#SBATCH -J step8
+#SBATCH -t 48:00:00
+#SBATCH -p RM
+#SBATCH --array=1-5
+
+#SBATCH --mail-user=youremail@email.email
+#SBATCH --mail-type=ALL
+#SBATCH -o %x-%j.out
+#SBATCH -e %x-%j.err
+
+#Adjust N and ntasks-per-node above according to your needs.
+#
+# Setup the module command
+set echo
+set -x
+
+# Load the needed modules
+module load gromacs/2020.2-cpu
+
+cd $SLURM_SUBMIT_DIR
+
+echo $SLURM_NPROCS
+
+mpirun -np $SLURM_NPROCS gmx_mpi mdrun -pin on -deffnm r$SLURM_ARRAY_TASK_ID/step8_nvt -v -maxh 47 -dlb yes
