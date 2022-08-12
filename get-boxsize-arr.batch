@@ -1,21 +1,20 @@
 #!/bin/bash
-#SBATCH -J eq            # Name of job; user chosen
-#SBATCH -p RM-shared           # queue: always use skx-normal
+#SBATCH -J loopbox              # Name of job; user chosen
+#SBATCH -p RM-shared           
 #SBATCH -N 1                    # number of nodes
 #SBATCH --ntasks-per-node 1
+#SBATCH -t 00:30:00
 #SBATCH --array=1-5
-#SBATCH -t 07:00:00
 #SBATCH --mail-user=sheafitz@udel.edu
 #SBATCH --mail-type=all
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err
 
-module load gromacs/2020.2-cpu
-
 set -x
 set echo
 
+module load gromacs/2020.2-cpu
+
 cd $SLURM_SUBMIT_DIR
 
-cd $PROJECT/visco-fluc/test-psm/r$SLURM_ARRAY_TASK_ID
-csh README
+echo '0' | gmx traj -f r$SLURM_ARRAY_TASK_ID/step7_boxsize.trr -s r$SLURM_ARRAY_TASK_ID/step7_boxsize.gro -ob

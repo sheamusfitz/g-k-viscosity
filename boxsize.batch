@@ -2,6 +2,7 @@
 #SBATCH -N 5
 #SBATCH --tasks-per-node=64
 #SBATCH --cpus-per-task=2
+#SBATCH --array=1-5
 #SBATCH -J boxsize
 #SBATCH -t 48:00:00
 #SBATCH -p RM
@@ -11,12 +12,11 @@
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err
 
-module load intel/18.0.2
-module load impi/18.0.2
-module load gromacs
+module load gromacs/2020.2-cpu
 
-mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
-mpirun -n 64 -o 64 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
-mpirun -n 64 -o  gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
-mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
-mpirun -n 64 -o 0 gmx_mpi mdrun -deffnm POPC/r1/step7_boxsize -v -dlb yes &
+cd $PROJECT/visc
+
+set -x
+set echo
+
+mpirun -np $SLURM_NPROCS gmx_mpi mdrun -pin on -deffnm r$SLURM_ARRAY_TASK_ID/step7_boxsize -v -maxh 47 -dlb yes -npme 60
