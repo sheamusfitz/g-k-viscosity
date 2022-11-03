@@ -5,7 +5,7 @@
 #SBATCH --ntasks-per-node 1
 #SBATCH -t 00:30:00
 #SBATCH --array=1-5
-# SBATCH --mail-user=email@email.email
+
 #SBATCH --mail-type=all
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err
@@ -17,4 +17,4 @@ module load gromacs/2020.2-cpu
 
 cd $SLURM_SUBMIT_DIR
 
-echo '0' | gmx traj -f r$SLURM_ARRAY_TASK_ID/step7_boxsize.trr -s r$SLURM_ARRAY_TASK_ID/step7_boxsize.gro -ob
+echo '0' | gmx_mpi traj -f r$SLURM_ARRAY_TASK_ID/step7_boxsize.trr -s r$SLURM_ARRAY_TASK_ID/step7_boxsize.gro -ob

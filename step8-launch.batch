@@ -7,7 +7,6 @@
 #SBATCH -p RM
 #SBATCH --array=1-5
 
-#SBATCH --mail-user=youremail@email.email
 #SBATCH --mail-type=ALL
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err

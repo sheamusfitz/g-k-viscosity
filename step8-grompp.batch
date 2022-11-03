@@ -7,7 +7,6 @@
 #SBATCH -t 00:10:00
 #SBATCH -p RM-shared
 
-# SBATCH --mail-user=email@email.email
 #SBATCH --mail-type=ALL
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err

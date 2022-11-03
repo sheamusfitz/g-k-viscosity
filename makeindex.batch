@@ -7,7 +7,6 @@
 #SBATCH -t 00:10:00
 #SBATCH -p RM-shared
 
-# SBATCH --mail-user=email@email.email
 #SBATCH --mail-type=ALL
 #SBATCH -o %x-%j.out
 #SBATCH -e %x-%j.err
@@ -29,7 +28,7 @@ make_ndx -f r$r/step6.6_equilibration.gro -o \
 r$r/index.ndx
 
 
-gmx grompp -f step7_boxsize.mdp \
+gmx_mpi grompp -f step7_boxsize.mdp \
 -o r$r/step7_boxsize.tpr \
 -c r$r/step6.6_equilibration.gro \
 -p r$r/topol.top -n r$r/index.ndx -maxwarn 1
