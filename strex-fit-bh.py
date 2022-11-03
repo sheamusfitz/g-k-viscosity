@@ -189,8 +189,8 @@ for r in range(1, 6):
         uncs = integ329_std[lip]
         means = integ329_mean[lip]
         thesetimes = times329
-    mint = np.abs(thesetimes - 3).argmin() + 1
-    maxt = np.abs(thesetimes - 5000).argmin() + 1
+    mint = np.abs(thesetimes - 10).argmin() + 1
+    maxt = np.abs(thesetimes - 3500).argmin() + 1
     print(mint, maxt)
     # log_inds = np.unique(np.logspace(
     #     np.log10(mint), np.log10(len(thesetimes)), num=50000, dtype=int))
@@ -276,12 +276,13 @@ for r in range(1, 6):
     output_params[lip]['viscs'][r - 1] = (
         10**results[f'{thelipid}-r{r}'].params['a'].value + this_integral[0]
     )
-    output_params[lip]['b'][r - 1] = (
-        results[f'{thelipid}-r{r}'].params['b'].value
-    )
-    output_params[lip]['t0'][r - 1] = (
-        10**results[f'{thelipid}-r{r}'].params['t0'].value
-    )
+
+    _b = results[f'{thelipid}-r{r}'].params['b'].value
+    _t0 = 10**results[f'{thelipid}-r{r}'].params['t0'].value
+
+    output_params[lip]['b'][r - 1] = _b
+    output_params[lip]['mrt'][r - 1] = _t0*sp.special.gamma(_b+1)
+    output_params[lip]['t0'][r - 1] = _t0
 
 try:
     output_combined
@@ -312,9 +313,12 @@ output_combined[lip]['visc unc'] = stats.sem(output_params[lip]['viscs'])
 #
 output_combined[lip]['mean t0'] = np.mean(output_params[lip]['t0'])
 output_combined[lip]['t0 unc'] = stats.sem(output_params[lip]['t0'])
-##
+#
 output_combined[lip]['mean b'] = np.mean(output_params[lip]['b'])
 output_combined[lip]['b unc'] = stats.sem(output_params[lip]['b'])
+
+output_combined[lip]['mean mrt'] = np.mean(output_params[lip]['mrt'])
+output_combined[lip]['mrt unc'] = stats.sem(output_params[lip]['mrt'])
 
 with open(f'{lip}-{thelipid}-results.txt', 'a') as f:
     f.write(f"\n\n\n{lip.upper()} Results:")
@@ -322,6 +326,8 @@ with open(f'{lip}-{thelipid}-results.txt', 'a') as f:
 {output_combined[lip]['visc unc']*1e11:0.4f}) x10^-11 Pa.m.s")
     f.write(
         f"\nτ_0\t= ({output_combined[lip]['mean t0']:0.5f} ± {output_combined[lip]['t0 unc']:0.5f}) ps")
+    f.write(
+        f"\nmrt\t= ({output_combined[lip]['mean mrt']:0.5f} ± {output_combined[lip]['mrt unc']:0.5f}) ps")
     f.write(
         f"\nb\t= ({output_combined[lip]['mean b']:0.3f} ± {output_combined[lip]['b unc']:0.3f})")
     f.write("\n\n\n")

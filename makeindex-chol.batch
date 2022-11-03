@@ -1,0 +1,36 @@
+#!/bin/bash
+#SBATCH -N 1
+#SBATCH --tasks-per-node=1
+#SBATCH --cpus-per-task=1
+#SBATCH --array=1-5
+#SBATCH -J makeindex
+#SBATCH -t 00:10:00
+#SBATCH -p RM-shared
+
+# SBATCH --mail-user=email@email.email
+#SBATCH --mail-type=ALL
+#SBATCH -o %x-%j.out
+#SBATCH -e %x-%j.err
+
+#Adjust N and ntasks-per-node above according to your needs.
+#
+# Setup the module command
+set echo
+set -x
+
+# Load the needed modules
+module load gromacs/2020.2-cpu
+cd $SLURM_SUBMIT_DIR
+
+r=$SLURM_ARRAY_TASK_ID
+
+echo -e '2|3 \nname 5 MEMB\nname 4 SOL_ION\n\nq' | gmx_mpi \
+make_ndx -f r$r/step6.6_equilibration.gro -o \
+r$r/index.ndx
+
+
+gmx_mpi grompp -f step7_boxsize.mdp \
+-o r$r/step7_boxsize.tpr \
+-c r$r/step6.6_equilibration.gro \
+-p r$r/topol.top -n r$r/index.ndx -maxwarn 1
+
